@@ -24,13 +24,18 @@ namespace InventoryKamera
         {
             // Determine maximum number of weapons to scan
             int weaponCount = count == 0 ? ScanItemCount() : count;
-            int page = 0;
+            int page = 1;
             var (rectangles, cols, rows) = GetPageOfItems(page);
+            if (rectangles == null || rectangles.Count == 0 || cols <= 0 || rows <= 0)
+            {
+                Logger.Error("Failed to detect initial weapon page layout. rows={0}, cols={1}, rectangles={2}", rows, cols, rectangles == null ? -1 : rectangles.Count);
+                return;
+            }
             int fullPage = cols * rows;
             int totalRows = (int)Math.Ceiling(weaponCount / (decimal)cols);
             int cardsQueued = 0;
             int rowsQueued = 0;
-            int offset = 0;
+            int clickYOffset = 0;
             UserInterface.SetWeapon_Max(weaponCount);
 
             // Determine Delay if delay has not been found before
@@ -45,16 +50,29 @@ namespace InventoryKamera
             // Go through weapon list
             while (cardsQueued < weaponCount)
             {
+                if (rectangles == null || rectangles.Count == 0 || cols <= 0 || rows <= 0)
+                {
+                    Logger.Warn("Invalid page detection while scanning weapons (page {0}). rows={1}, cols={2}, rectangles={3}", page, rows, cols, rectangles == null ? -1 : rectangles.Count);
+                    break;
+                }
+
                 Logger.Debug("Scanning weapon page {0}", page);
                 Logger.Debug("Located {0} possible item locations on page.", rectangles.Count);
 
                 int cardsRemaining = weaponCount - cardsQueued;
+                int rawStartIndex = cardsRemaining < fullPage ? (rows - (totalRows - rowsQueued)) * cols : 0;
+                int startIndex = Math.Max(0, rawStartIndex);
+                if (startIndex >= rectangles.Count)
+                {
+                    Logger.Warn("Calculated start index {0} is outside rectangle count {1}. Resetting start index to 0.", rawStartIndex, rectangles.Count);
+                    startIndex = 0;
+                }
                 // Go through each "page" of items and queue. In the event that not a full page of
                 // items are scrolled to, offset the index of rectangle to start clicking from
-                for (int i = cardsRemaining < fullPage ? (rows - (totalRows - rowsQueued)) * cols : 0; i < rectangles.Count; i++)
+                for (int i = startIndex; i < rectangles.Count; i++)
                 {
                     Rectangle item = rectangles[i];
-                    Navigation.SetCursor(item.Center().X, item.Center().Y + offset);
+                    Navigation.SetCursor(item.Center().X, item.Center().Y + clickYOffset);
                     Navigation.Click();
                     Navigation.SystemWait(Navigation.Speed.SelectNextInventoryItem);
 
@@ -71,39 +89,39 @@ namespace InventoryKamera
                 Logger.Debug("Finished queuing page of weapons. Scrolling...");
 
                 rowsQueued += rows;
+                int rowsRemaining = totalRows - rowsQueued;
+                if (rowsRemaining <= 0)
+                {
+                    break;
+                }
 
                 // Page done, now scroll
                 // If the number of remaining scans is shorter than a full page then
                 // only scroll a few rows
-                if (totalRows - rowsQueued <= rows)
+                if (rowsRemaining <= rows)
                 {
-                    if (Navigation.GetAspectRatio() == new Size(8, 5))
-                    {
-                        offset = 35; // Lazy fix
-                    }
-                    for (int i = 0; i < 10 * (totalRows - rowsQueued) - 1; i++)
-                    {
-                        Navigation.sim.Mouse.VerticalScroll(-1);
-                        Navigation.Wait(1);
-                    }
+                    clickYOffset = Navigation.GetAspectRatio() == new Size(8, 5) ? 35 : 0;
+                    int scrolls = Math.Max(0, (10 * rowsRemaining) - 1);
+                    Navigation.Scroll(Navigation.Direction.DOWN, scrolls, 1);
                     Navigation.SystemWait(Navigation.Speed.Fast);
                 }
                 else
                 {
+                    clickYOffset = 0;
+                    int scrolls = Math.Max(0, (10 * rows) - 1);
+                    Navigation.Scroll(Navigation.Direction.DOWN, scrolls, 1);
                     // Scroll back one to keep it from getting too crazy
-                    if (rowsQueued % 15 == 0)
+                    var rollbackPeriod = Navigation.IsNormal ? 9 : 3;
+                    if (scrolls > 0 && page % rollbackPeriod == 0)
                     {
+                        Logger.Debug("Scrolled back one");
                         Navigation.sim.Mouse.VerticalScroll(1);
-                    }
-                    for (int i = 0; i < 10 * rows - 1; i++)
-                    {
-                        Navigation.sim.Mouse.VerticalScroll(-1);
                         Navigation.Wait(1);
                     }
                     Navigation.SystemWait(Navigation.Speed.Fast);
                 }
                 ++page;
-                (rectangles, cols, rows) = GetPageOfItems(page, acceptLess: totalRows - rowsQueued <= fullPage);
+                (rectangles, cols, rows) = GetPageOfItems(page, acceptLess: rowsRemaining <= rows);
             }
 
             void SelectLevelSorting()
