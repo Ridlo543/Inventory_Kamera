@@ -137,39 +137,37 @@ namespace InventoryKamera
 				Logger.Debug("Finished queuing page of artifacts. Scrolling...");
 
 				rowsQueued += rows;
+				int rowsRemaining = totalRows - rowsQueued;
+				if (rowsRemaining <= 0)
+				{
+					break;
+				}
 
 				// Page done, now scroll
 				// If the number of remaining scans is shorter than a full page then
 				// only scroll a few rows
-				if (totalRows - rowsQueued <= rows)
+				if (rowsRemaining <= rows)
 				{
-					for (int i = 0; i < 10 * ( totalRows - rowsQueued ) - 1; i++)
-					{
-						Navigation.sim.Mouse.VerticalScroll(-1);
-						Navigation.Wait(1);
-					}
+					int scrolls = Math.Max(0, (10 * rowsRemaining) - 1);
+					Navigation.Scroll(Navigation.Direction.DOWN, scrolls, 1);
 					Navigation.SystemWait(Navigation.Speed.Fast);
 				}
 				else
 				{
-                    
-                    for (int i = 0; i < 10 * rows - 1; i++)
-					{
-						Navigation.sim.Mouse.VerticalScroll(-1);
-						Navigation.Wait(1);
-					}
+					int scrolls = Math.Max(0, (10 * rows) - 1);
+					Navigation.Scroll(Navigation.Direction.DOWN, scrolls, 1);
 					// Scroll back one to keep it from getting too crazy
 					var rollbackPeriod = Navigation.IsNormal ? 9 : 3;
-                    if (page % rollbackPeriod == 0)
-                    {
+					if (scrolls > 0 && page % rollbackPeriod == 0)
+					{
 						Logger.Debug("Scrolled back one");
 						Navigation.sim.Mouse.VerticalScroll(1);
 						Navigation.Wait(1);
-                    }
-                    Navigation.SystemWait(Navigation.Speed.Fast);
+					}
+					Navigation.SystemWait(Navigation.Speed.Fast);
 				}
 				++page;
-				(rectangles, cols, rows) = GetPageOfItems(page, acceptLess: totalRows - rowsQueued <= fullPage);
+				(rectangles, cols, rows) = GetPageOfItems(page, acceptLess: rowsRemaining <= rows);
 			}
 		}
 
@@ -226,7 +224,9 @@ namespace InventoryKamera
 			sanctify = GetSanctifyBitmap(card);
             // Check for lock color
             Color sanctifiedColor = Color.FromArgb(255, 220, 192, 255); // Dark area around red lock
-            Color sanctifyStatus = sanctify.GetPixel(10, 10);
+			int sanctifyX = Math.Min(10, Math.Max(0, sanctify.Width - 1));
+			int sanctifyY = Math.Min(10, Math.Max(0, sanctify.Height - 1));
+			Color sanctifyStatus = sanctify.GetPixel(sanctifyX, sanctifyY);
             _sanctify = GenshinProcesor.CompareColors(sanctifiedColor, sanctifyStatus);
 
             // may change because of sanctifying
