@@ -40,6 +40,10 @@ namespace InventoryKamera
 		// Current Images
 		private static PictureBox navigation_PictureBox;
 
+		private static readonly object artifactCounterLock = new object();
+		private static readonly object weaponCounterLock = new object();
+		private static readonly object characterCounterLock = new object();
+
 		public static void Init(PictureBox _gear_PictureBox, TextBox _a_textbox, PictureBox _c_name, PictureBox _c_level, PictureBox[] _c_talent, TextBox _c_textbox, Label _weaponCount, Label _weaponMax, Label _artifactCount, Label _artifactMax, Label _characterCount, Label _programStatus, TextBox _error_textBox, PictureBox _navigation_Image)
 		{
 			// Artifacts and Weapons
@@ -212,7 +216,7 @@ namespace InventoryKamera
 
 		public static void IncrementArtifactCount()
 		{
-			lock (artifactCount_Label)
+			lock (artifactCounterLock)
 			{
 				UpdateLabel($"{Int32.Parse(artifactCount_Label.Text) + 1}", artifactCount_Label);
 			}
@@ -220,7 +224,7 @@ namespace InventoryKamera
 
 		public static void IncrementWeaponCount()
 		{
-			lock (weaponCount_Label)
+			lock (weaponCounterLock)
 			{
 				UpdateLabel($"{Int32.Parse(weaponCount_Label.Text) + 1}", weaponCount_Label);
 			}
@@ -228,7 +232,7 @@ namespace InventoryKamera
 
 		public static void IncrementCharacterCount()
 		{
-			lock (characterCount_Label)
+			lock (characterCounterLock)
 			{
 				UpdateLabel($"{Int32.Parse(characterCount_Label.Text) + 1}", characterCount_Label);
 			}

@@ -23,6 +23,7 @@ namespace InventoryKamera
 		private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
 		private const int numEngines = 8;
+		private static readonly AutoResetEvent engineAvailable = new AutoResetEvent(false);
 
 		private static readonly string tesseractDatapath = $".\\tessdata";
 		private static readonly string tesseractLanguage = "genshin_fast_09_04_21";
@@ -159,6 +160,7 @@ namespace InventoryKamera
 				for (int i = 0; i < numEngines; i++)
 				{
 					engines.Add(new TesseractEngine(tesseractDatapath, tesseractLanguage, EngineMode.LstmOnly));
+					engineAvailable.Set();
 				}
 			}
 			catch (Exception ex)
@@ -183,6 +185,7 @@ namespace InventoryKamera
 				for (int i = 0; i < numEngines; i++)
 				{
 					engines.Add(new TesseractEngine(tesseractDatapath, tesseractLanguage, EngineMode.LstmOnly));
+					engineAvailable.Set();
 				}
 			}
 			Logger.Debug("{numEngines} Engines restarted", numEngines);
@@ -193,9 +196,12 @@ namespace InventoryKamera
 		{
 			string text = "";
 			TesseractEngine e;
-			while (!engines.TryTake(out e)) { Thread.Sleep(10); }
+			while (!engines.TryTake(out e))
+			{
+				engineAvailable.WaitOne(25);
+			}
 
-			if (numbersOnly) e.SetVariable("tessedit_char_whitelist", "0123456789");
+			e.SetVariable("tessedit_char_whitelist", numbersOnly ? "0123456789" : string.Empty);
 			using (var page = e.Process(bitmap, pageMode))
 			{
 				using (var iter = page.GetIterator())
@@ -209,6 +215,7 @@ namespace InventoryKamera
 				}
 			}
 			engines.Add(e);
+			engineAvailable.Set();
 
 			return text;
 		}

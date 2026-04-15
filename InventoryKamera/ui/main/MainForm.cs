@@ -239,8 +239,6 @@ namespace InventoryKamera
 
         private void StartButton_Clicked(object sender, EventArgs e)
         {
-            GC.Collect();
-
             UserInterface.ResetAll();
 
             UserInterface.SetProgramStatus("Scanning");
@@ -295,7 +293,10 @@ namespace InventoryKamera
                             throw new NotImplementedException($"{Navigation.GetSize().Width}x{Navigation.GetSize().Height} is an unsupported resolution.");
                         }
 
-                        if (Navigation.GetSize() != Navigation.CaptureWindow().Size) throw new FormatException("Window size and screenshot size mismatch. Please make sure the game is not in a fullscreen mode.");
+                        using (var capture = Navigation.CaptureWindow())
+                        {
+                            if (Navigation.GetSize() != capture.Size) throw new FormatException("Window size and screenshot size mismatch. Please make sure the game is not in a fullscreen mode.");
+                        }
 
                         data = new InventoryKamera();
 
