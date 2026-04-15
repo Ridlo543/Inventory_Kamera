@@ -79,19 +79,22 @@ namespace InventoryKamera
 			UpdateTextBox(text, textBox);
 		}
 
+		private static void ReplacePictureBoxImage(PictureBox pictureBox, Bitmap image)
+		{
+			Image old = pictureBox.Image;
+			pictureBox.Image = image;
+			pictureBox.Refresh();
+			old?.Dispose();
+		}
+
 		private static void UpdatePictureBox(Bitmap bm, PictureBox pictureBox)
 		{
 			try
 			{
-				Bitmap clone = new Bitmap(bm.Width, bm.Height);
-				using (var copy = Graphics.FromImage(clone))
-				{
-					copy.DrawImage(bm, 0, 0);
-				}
+				Bitmap clone = (Bitmap)bm.Clone();
 				MethodInvoker pictureBoxAction = delegate
 			{
-				pictureBox.Image = clone;
-				pictureBox.Refresh();
+				ReplacePictureBoxImage(pictureBox, clone);
 			};
 				pictureBox.Invoke(pictureBoxAction);
 			}
@@ -264,11 +267,11 @@ namespace InventoryKamera
 
 		public static void ResetCharacterDisplay()
 		{
-			MethodInvoker nameAction = delegate { cName_PictureBox.Image = null; };
-			MethodInvoker levelAction = delegate { cLevel_PictureBox.Image = null; };
-			MethodInvoker talentAction_1 = delegate { cTalent_PictureBoxes[0].Image = null; };
-			MethodInvoker talentAction_2 = delegate { cTalent_PictureBoxes[1].Image = null; };
-			MethodInvoker talentAction_3 = delegate { cTalent_PictureBoxes[2].Image = null; };
+			MethodInvoker nameAction = delegate { ReplacePictureBoxImage(cName_PictureBox, null); };
+			MethodInvoker levelAction = delegate { ReplacePictureBoxImage(cLevel_PictureBox, null); };
+			MethodInvoker talentAction_1 = delegate { ReplacePictureBoxImage(cTalent_PictureBoxes[0], null); };
+			MethodInvoker talentAction_2 = delegate { ReplacePictureBoxImage(cTalent_PictureBoxes[1], null); };
+			MethodInvoker talentAction_3 = delegate { ReplacePictureBoxImage(cTalent_PictureBoxes[2], null); };
 			MethodInvoker textAction = delegate { character_TextBox.Clear(); };
 
 			cName_PictureBox.Invoke(nameAction);
@@ -281,7 +284,7 @@ namespace InventoryKamera
 
 		public static void ResetGearDisplay()
 		{
-			MethodInvoker gearAction = delegate { gear_PictureBox.Image = null; };
+			MethodInvoker gearAction = delegate { ReplacePictureBoxImage(gear_PictureBox, null); };
 
 			MethodInvoker textAction = delegate { gear_TextBox.Clear(); };
 

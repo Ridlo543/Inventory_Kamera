@@ -435,19 +435,27 @@ namespace InventoryKamera
                         itemCount = rows * cols;
                         if (itemCount != itemPerPage && !acceptLess)
                         {
-                            Logger.Warn("Unable to locate full page of {0} with weight {1} on page {2}", inventoryPage, weight, pageNum);
-                            Logger.Warn("Detected {0} rows and {1} columns of items ({2}/{3})", rows, cols, itemCount, itemPerPage);
+                            int attemptNumber = attempts + 1;
+                            bool shouldLogAttempt = attemptNumber == 1 || attemptNumber % 5 == 0 || attemptNumber == maxAttempts;
+                            if (shouldLogAttempt)
+                            {
+                                Logger.Warn("Unable to locate full page of {0} with weight {1} on page {2} (attempt {3}/{4})", inventoryPage, weight, pageNum, attemptNumber, maxAttempts);
+                                Logger.Warn("Detected {0} rows and {1} columns of items ({2}/{3})", rows, cols, itemCount, itemPerPage);
+                            }
 
                             // Generate rectangles
-                            using (Bitmap copy = (Bitmap)screenshot.Clone())
+                            if (shouldLogAttempt)
                             {
-                                SaveInventoryBitmap(copy, $"{inventoryPage}Inventory{pageNum}_{cols}x{rows}.png");
-                                using (Graphics g = Graphics.FromImage(copy))
-                                    rectangles.ForEach(r => g.DrawRectangle(new Pen(Color.Green, 2), r));
-                                SaveInventoryBitmap(copy, $"{inventoryPage}Inventory{pageNum}_{cols}x{rows} - weight {weight}.png");
+                                using (Bitmap copy = (Bitmap)screenshot.Clone())
+                                {
+                                    SaveInventoryBitmap(copy, $"{inventoryPage}Inventory{pageNum}_{cols}x{rows}.png");
+                                    using (Graphics g = Graphics.FromImage(copy))
+                                        rectangles.ForEach(r => g.DrawRectangle(new Pen(Color.Green, 2), r));
+                                    SaveInventoryBitmap(copy, $"{inventoryPage}Inventory{pageNum}_{cols}x{rows} - weight {weight}.png");
 #if DEBUG
-                                //Navigation.DisplayBitmap(copy, $"weight = {weight}");
+                                    //Navigation.DisplayBitmap(copy, $"weight = {weight}");
 #endif
+                                }
                             }
 
                             int delta = itemPerPage - itemCount;
