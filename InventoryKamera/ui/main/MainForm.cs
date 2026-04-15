@@ -88,13 +88,10 @@ namespace InventoryKamera
             // Check if scanner is running
             if (scannerThread?.IsAlive == true)
             {
-                // Request graceful stop to avoid aborting worker/thread state mid-operation.
+                // Request graceful stop without blocking UI thread.
                 data?.RequestStop();
-                data?.StopImageProcessorWorkers();
 
-                UserInterface.SetProgramStatus("Scan Stopped");
-
-                Navigation.Reset();
+                UserInterface.SetProgramStatus("Stopping...");
             }
         }
 
@@ -309,6 +306,12 @@ namespace InventoryKamera
                         // The Data object of json object
                         data.GatherData();
 
+                        if (data.StopRequested)
+                        {
+                            UserInterface.SetProgramStatus("Scan stopped");
+                            return;
+                        }
+
                         // Covert to GOOD
                         GOOD good = new GOOD(data);
                         Logger.Info("Data converted to GOOD");
@@ -319,12 +322,6 @@ namespace InventoryKamera
 
                         UserInterface.SetProgramStatus("Finished");
                         exportedData = good;
-                    }
-                    catch (ThreadAbortException)
-                    {
-                        // Workers can get stuck if the thread is aborted or an exception is raised
-                        data?.StopImageProcessorWorkers();
-                        UserInterface.SetProgramStatus("Scan stopped");
                     }
                     catch (NotImplementedException ex)
                     {

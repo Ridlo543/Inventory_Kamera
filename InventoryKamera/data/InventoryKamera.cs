@@ -34,7 +34,10 @@ namespace InventoryKamera
 		private MaterialScraper materialScraper;
 
 		private volatile bool b_threadCancel;
+		private volatile bool b_stopRequested;
 		private readonly int NumWorkers;
+
+		public bool StopRequested => b_stopRequested;
 
 		public bool HasData
         {
@@ -56,6 +59,7 @@ namespace InventoryKamera
 			materialScraper = new MaterialScraper();
 
 			b_threadCancel = false;
+			b_stopRequested = false;
 
             switch (Properties.Settings.Default.ScannerDelay)
             {
@@ -91,6 +95,7 @@ namespace InventoryKamera
 		public void StopImageProcessorWorkers()
 		{
 			b_threadCancel = true;
+			b_stopRequested = true;
 			weaponScraper.StopScanning = true;
 			artifactScraper.StopScanning = true;
 			workerQueue.Signal();
@@ -101,6 +106,7 @@ namespace InventoryKamera
 		public void RequestStop()
 		{
 			b_threadCancel = true;
+			b_stopRequested = true;
 			weaponScraper.StopScanning = true;
 			artifactScraper.StopScanning = true;
 			workerQueue.Signal();
@@ -108,11 +114,12 @@ namespace InventoryKamera
 
 		private bool ShouldStop()
 		{
-			return b_threadCancel;
+			return b_threadCancel || b_stopRequested;
 		}
 
 		public void GatherData()
 		{
+			b_stopRequested = false;
 
 			ResetLogging();
 
@@ -251,7 +258,11 @@ namespace InventoryKamera
 				GenshinProcesor.UpdateCharacterName("manequin2", Properties.Settings.Default.Manequin2Name);
 			}
 
-			if (ShouldStop()) return;
+			if (ShouldStop())
+			{
+				StopImageProcessorWorkers();
+				return;
+			}
 
             if (Properties.Settings.Default.ScanWeapons)
 			{
@@ -294,7 +305,11 @@ namespace InventoryKamera
 				Logger.Info("Done scanning artifacts");
 			}
 
-			if (ShouldStop()) return;
+			if (ShouldStop())
+			{
+				StopImageProcessorWorkers();
+				return;
+			}
 
 			workerQueue.Enqueue(new OCRImageCollection(null, "END", 0));
 
@@ -319,7 +334,11 @@ namespace InventoryKamera
 			// Wait for Image Processors to finish
 			AwaitProcessors();
 
-			if (ShouldStop()) return;
+			if (ShouldStop())
+			{
+				StopImageProcessorWorkers();
+				return;
+			}
 
 			if (Properties.Settings.Default.ScanCharacters)
 			{
