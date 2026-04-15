@@ -93,6 +93,7 @@ namespace InventoryKamera
 			b_threadCancel = true;
 			weaponScraper.StopScanning = true;
 			artifactScraper.StopScanning = true;
+			workerQueue.Signal();
 			AwaitProcessors();
 			workerQueue = new Queue<OCRImageCollection>();
 		}
@@ -102,6 +103,7 @@ namespace InventoryKamera
 			b_threadCancel = true;
 			weaponScraper.StopScanning = true;
 			artifactScraper.StopScanning = true;
+			workerQueue.Signal();
 		}
 
 		private bool ShouldStop()
@@ -553,8 +555,8 @@ namespace InventoryKamera
 				}
 				else
 				{
-					// Wait for more images to process
-					Thread.Sleep(250);
+					// Wait for more images to process without busy polling.
+					workerQueue.WaitForItem(100);
 				}
 			}
 			Logger.Debug("Thread {threadId} exit", Thread.CurrentThread.ManagedThreadId);

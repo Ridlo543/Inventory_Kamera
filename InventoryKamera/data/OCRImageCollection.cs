@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Threading;
 
 namespace InventoryKamera
 {
@@ -22,6 +23,7 @@ namespace InventoryKamera
 	{
 		/// <summary>Used as a lock target to ensure thread safety.</summary>
 		private readonly object _Locker = new object();
+		private readonly AutoResetEvent _HasItems = new AutoResetEvent(false);
 
 		private readonly System.Collections.Generic.Queue<T> _Queue = new System.Collections.Generic.Queue<T>();
 
@@ -32,11 +34,13 @@ namespace InventoryKamera
 			{
 				_Queue.Enqueue(item);
 			}
+			_HasItems.Set();
 		}
 
 		/// <summary>Enqueues a collection of items into this queue.</summary>
 		public virtual void EnqueueRange(IEnumerable<T> items)
 		{
+			bool anyAdded = false;
 			lock (_Locker)
 			{
 				if (items == null)
@@ -47,7 +51,13 @@ namespace InventoryKamera
 				foreach (T item in items)
 				{
 					_Queue.Enqueue(item);
+					anyAdded = true;
 				}
+			}
+
+			if (anyAdded)
+			{
+				_HasItems.Set();
 			}
 		}
 
@@ -89,6 +99,10 @@ namespace InventoryKamera
 				if (_Queue.Count > 0)
 				{
 					item = _Queue.Dequeue();
+					if (_Queue.Count > 0)
+					{
+						_HasItems.Set();
+					}
 					return true;
 				}
 				else
@@ -97,6 +111,24 @@ namespace InventoryKamera
 					return false;
 				}
 			}
+		}
+
+		public bool WaitForItem(int timeoutMs)
+		{
+			lock (_Locker)
+			{
+				if (_Queue.Count > 0)
+				{
+					return true;
+				}
+			}
+
+			return _HasItems.WaitOne(timeoutMs);
+		}
+
+		public void Signal()
+		{
+			_HasItems.Set();
 		}
 	}
 }
