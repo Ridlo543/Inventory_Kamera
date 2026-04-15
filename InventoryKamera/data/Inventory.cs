@@ -1,9 +1,9 @@
-﻿using System.Collections.Generic;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
+using System.Collections.Generic;
 
 namespace InventoryKamera
 {
-	public class Inventory
+    public class Inventory
 	{
 		[JsonProperty]
 		public List<Weapon> Weapons { get; private set; }
@@ -19,17 +19,16 @@ namespace InventoryKamera
 
 		[JsonProperty]
 		public HashSet<Material> AllMaterials
-		{ 
-			get 
+		{
+			get
 			{
 				var all = new HashSet<Material>();
 				all.UnionWith(Materials);
 				all.UnionWith(DevMaterials);
 				return all;
 			}
-			private set { } 
+			private set { }
 		}
-		//private List<Artifact> equippedArtifacts;
 
 		public int Size
 		{

@@ -7,6 +7,8 @@ namespace InventoryKamera
 {
 	public static class UserInterface
 	{
+		private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+
 		// Artifacts and Weapons
 		private static PictureBox gear_PictureBox;
 
@@ -91,7 +93,7 @@ namespace InventoryKamera
 			}
 			catch (Exception e)
 			{
-				Debug.WriteLine($"Problem updating picturebox {pictureBox.Name}\n{e.StackTrace}");
+				Logger.Debug($"Problem updating picturebox {0}\n{1}", pictureBox.Name, e);
 			}
 		}
 
@@ -109,7 +111,7 @@ namespace InventoryKamera
 			}
 			catch (Exception e)
 			{
-				Debug.WriteLine($"Problem updating textbox {textBox.Name}\n{e.StackTrace}");
+				Logger.Debug($"Problem updating picturebox {0}\n{1}", textBox.Name, e);
 			}
 		}
 
@@ -126,7 +128,8 @@ namespace InventoryKamera
 			}
 			catch (Exception e)
 			{
-				Debug.WriteLine($"Problem updating label {label.Name}\n{e.StackTrace}");
+				Logger.Debug($"Problem updating picturebox {0}\n{1}", label.Name, e);
+
 			}
 		}
 
@@ -198,26 +201,37 @@ namespace InventoryKamera
 		public static void SetWeapon_Max(int value)
 		{
 			UpdateLabel(value.ToString(), weaponMax_Label);
+			Logger.Info("Parsed {value} weapons to scan", value);
 		}
 
 		public static void SetArtifact_Max(int value)
 		{
 			UpdateLabel(value.ToString(), artifactMax_Label);
+			Logger.Info("Parsed {value} artifacts to scan", value);
 		}
 
 		public static void IncrementArtifactCount()
 		{
-			UpdateLabel($"{Int32.Parse(artifactCount_Label.Text) + 1}", artifactCount_Label);
+			lock (artifactCount_Label)
+			{
+				UpdateLabel($"{Int32.Parse(artifactCount_Label.Text) + 1}", artifactCount_Label);
+			}
 		}
 
 		public static void IncrementWeaponCount()
 		{
-			UpdateLabel($"{Int32.Parse(weaponCount_Label.Text) + 1}", weaponCount_Label);
+			lock (weaponCount_Label)
+			{
+				UpdateLabel($"{Int32.Parse(weaponCount_Label.Text) + 1}", weaponCount_Label);
+			}
 		}
 
 		public static void IncrementCharacterCount()
 		{
-			UpdateLabel($"{Int32.Parse(characterCount_Label.Text) + 1}", characterCount_Label);
+			lock (characterCount_Label)
+			{
+				UpdateLabel($"{Int32.Parse(characterCount_Label.Text) + 1}", characterCount_Label);
+			}
 		}
 
 		public static void SetProgramStatus(string status, bool ok = true)
@@ -236,6 +250,7 @@ namespace InventoryKamera
 		public static void AddError(string error)
 		{
 			UpdateTextBox($"{error.Replace("\n", Environment.NewLine)}" + Environment.NewLine, error_TextBox);
+			Logger.Error(error);
 		}
 
 		public static void SetNavigation_Image(Bitmap bm)

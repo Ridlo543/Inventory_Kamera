@@ -20,19 +20,19 @@ namespace InventoryKamera
 
 		[JsonProperty("location")]
 		[DefaultValue("")]
-		public string EquippedCharacter { get; private set; }
+		public string EquippedCharacter { get; internal set; }
 
 		[JsonProperty("lock")]
 		public bool Lock { get; private set; }
 
+		[JsonProperty("id")]
+		public int Id { get; private set; }
 		[JsonIgnore]
+		
 		public int Rarity { get; private set; }
 
 		[JsonIgnore]
 		public bool Ascended { get; private set; }
-
-		[JsonIgnore]
-		public int Id { get; private set; }
 
 		[JsonIgnore]
 		public WeaponType WeaponType { get; private set; }
@@ -74,12 +74,13 @@ namespace InventoryKamera
 			}
 		}
 
-		public Weapon(string _name, int _level, bool _ascended, int _refinementLevel, string _equippedCharacter = null, int _id = 0, int _rarity = -1)
+		public Weapon(string _name, int _level, bool _ascended, int _refinementLevel, bool locked = false, string _equippedCharacter = null, int _id = 0, int _rarity = -1)
 		{
 			Name = string.IsNullOrWhiteSpace(_name) ? "" : _name;
 			Level = _level;
 			Ascended = _ascended;
 			RefinementLevel = _rarity > 2 ?_refinementLevel : 1; // 2 and 1 star weapons do not have refinement levels
+			Lock = locked;
 			EquippedCharacter = string.IsNullOrWhiteSpace(_equippedCharacter) ? "" : _equippedCharacter;
 			Id = _id;
 			Rarity = _rarity;
@@ -107,12 +108,12 @@ namespace InventoryKamera
 
 		public bool HasValidWeaponName()
 		{
-			return Scraper.IsValidWeapon(Name);
+			return GenshinProcesor.IsValidWeapon(Name);
 		}
 
 		public bool HasValidEquippedCharacter()
 		{
-			return string.IsNullOrWhiteSpace(EquippedCharacter) || Scraper.IsValidCharacter(EquippedCharacter) ;
+			return string.IsNullOrWhiteSpace(EquippedCharacter) || GenshinProcesor.IsValidCharacter(EquippedCharacter) ;
 		}
 
 		public int AscensionCount()
