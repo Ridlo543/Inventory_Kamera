@@ -2,6 +2,7 @@
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -119,13 +120,26 @@ namespace InventoryKamera
 
 		public void GatherData()
 		{
+			var totalScanTimer = Stopwatch.StartNew();
+			void LogPhaseDuration(string phase, Stopwatch timer)
+			{
+				Logger.Info("Telemetry|Phase={phase}|DurationMs={duration}", phase, timer.ElapsedMilliseconds);
+			}
+
+			try
+			{
 			b_stopRequested = false;
 
+			var setupTimer = Stopwatch.StartNew();
 			ResetLogging();
+ 			LogPhaseDuration("setup.logging", setupTimer);
 
+			setupTimer.Restart();
 			GenshinProcesor.ReloadData();
+			LogPhaseDuration("setup.reload_data", setupTimer);
 
 			// Initize Image Processors
+			setupTimer.Restart();
 			for (int i = 0; i < NumWorkers; i++)
 			{
 				Thread processor = new Thread(ImageProcessorWorker){ IsBackground = true };
@@ -133,8 +147,11 @@ namespace InventoryKamera
 				ImageProcessors.Add(processor);
 			}
 			Logger.Debug("Added {ImageProcessors.Count} workers", ImageProcessors.Count);
+			LogPhaseDuration("setup.init_workers", setupTimer);
 
+			setupTimer.Restart();
 			GenshinProcesor.RestartEngines();
+			LogPhaseDuration("setup.restart_ocr_engines", setupTimer);
 
 
 			// Assign Traveler's custom name
@@ -253,9 +270,11 @@ namespace InventoryKamera
 
 			if (patchedManequins)
 			{
+				setupTimer.Restart();
 				GenshinProcesor.ReloadData();
 				GenshinProcesor.UpdateCharacterName("manequin1", Properties.Settings.Default.Manequin1Name);
 				GenshinProcesor.UpdateCharacterName("manequin2", Properties.Settings.Default.Manequin2Name);
+				LogPhaseDuration("setup.patch_manequins", setupTimer);
 			}
 
 			if (ShouldStop())
@@ -266,6 +285,7 @@ namespace InventoryKamera
 
             if (Properties.Settings.Default.ScanWeapons)
 			{
+				var phaseTimer = Stopwatch.StartNew();
 				Logger.Info("Scanning weapons...");
 				// Get Weapons
 				Navigation.InventoryScreen();
@@ -282,10 +302,12 @@ namespace InventoryKamera
 				}
 				Navigation.MainMenuScreen();
 				Logger.Info("Done scanning weapons");
+				LogPhaseDuration("scan.weapons", phaseTimer);
 			}
 
 			if (Properties.Settings.Default.ScanArtifacts)
 			{
+				var phaseTimer = Stopwatch.StartNew();
 				Logger.Info("Scanning artifacts...");
 
 				// Get Artifacts
@@ -303,6 +325,7 @@ namespace InventoryKamera
 				}
 				Navigation.MainMenuScreen();
 				Logger.Info("Done scanning artifacts");
+				LogPhaseDuration("scan.artifacts", phaseTimer);
 			}
 
 			if (ShouldStop())
@@ -315,6 +338,7 @@ namespace InventoryKamera
 
 			if (Properties.Settings.Default.ScanCharacters)
 			{
+				var phaseTimer = Stopwatch.StartNew();
 				Logger.Info("Scanning characters...");
 				// Get characters
 				Navigation.CharacterScreen();
@@ -329,10 +353,13 @@ namespace InventoryKamera
 				}
 				Navigation.MainMenuScreen();
 				Logger.Info("Done scanning characters");
+				LogPhaseDuration("scan.characters", phaseTimer);
 			}
 
 			// Wait for Image Processors to finish
+			var waitTimer = Stopwatch.StartNew();
 			AwaitProcessors();
+			LogPhaseDuration("scan.await_processors", waitTimer);
 
 			if (ShouldStop())
 			{
@@ -342,16 +369,19 @@ namespace InventoryKamera
 
 			if (Properties.Settings.Default.ScanCharacters)
 			{
+				var phaseTimer = Stopwatch.StartNew();
 				// Assign Artifacts to Characters
 				if (Properties.Settings.Default.ScanArtifacts)
 					AssignArtifacts();
 				if (Properties.Settings.Default.ScanWeapons)
 					AssignWeapons();
+				LogPhaseDuration("post.assign_equipment", phaseTimer);
 			}
 
 			// Scan Character Development Items
 			if (Properties.Settings.Default.ScanCharDevItems)
 			{
+				var phaseTimer = Stopwatch.StartNew();
 				Logger.Info("Scanning character development materials...");
 				// Get Materials
 				Navigation.InventoryScreen();
@@ -370,11 +400,13 @@ namespace InventoryKamera
 				}
 				Navigation.MainMenuScreen();
 				Logger.Info("Done scanning character development materials");
+				LogPhaseDuration("scan.char_dev_materials", phaseTimer);
 			}
 
 			// Scan Materials
 			if (Properties.Settings.Default.ScanMaterials)
 			{
+				var phaseTimer = Stopwatch.StartNew();
 				Logger.Info("Scanning materials...");
 				// Get Materials
 				Navigation.InventoryScreen();
@@ -393,6 +425,13 @@ namespace InventoryKamera
 				}
 				Navigation.MainMenuScreen();
 				Logger.Info("Done scanning materials");
+				LogPhaseDuration("scan.materials", phaseTimer);
+			}
+			}
+			finally
+			{
+				totalScanTimer.Stop();
+				Logger.Info("Telemetry|Phase=scan.total|DurationMs={duration}|StopRequested={stopRequested}", totalScanTimer.ElapsedMilliseconds, b_stopRequested);
 			}
 		}
 

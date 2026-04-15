@@ -12,8 +12,10 @@ using System.Drawing.Imaging;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Threading.Tasks;
 using Tesseract;
 
 namespace InventoryKamera
@@ -191,33 +193,91 @@ namespace InventoryKamera
 			Logger.Debug("{numEngines} Engines restarted", numEngines);
 		}
 
-		/// <summary> Use Tesseract OCR to find words on picture to string </summary>
-		internal static string AnalyzeText(Bitmap bitmap, PageSegMode pageMode = PageSegMode.SingleLine, bool numbersOnly = false)
+		private static string ExtractText(TesseractEngine engine, Bitmap bitmap, PageSegMode pageMode)
 		{
-			string text = "";
-			TesseractEngine e;
-			while (!engines.TryTake(out e))
-			{
-				engineAvailable.WaitOne(25);
-			}
-
-			e.SetVariable("tessedit_char_whitelist", numbersOnly ? "0123456789" : string.Empty);
-			using (var page = e.Process(bitmap, pageMode))
+			var text = new StringBuilder();
+			using (var page = engine.Process(bitmap, pageMode))
 			{
 				using (var iter = page.GetIterator())
 				{
 					iter.Begin();
 					do
 					{
-						text += iter.GetText(PageIteratorLevel.TextLine);
+						text.Append(iter.GetText(PageIteratorLevel.TextLine));
 					}
 					while (iter.Next(PageIteratorLevel.TextLine));
 				}
 			}
-			engines.Add(e);
-			engineAvailable.Set();
 
-			return text;
+			return text.ToString();
+		}
+
+		/// <summary> Use Tesseract OCR to find words on picture to string </summary>
+		internal static string AnalyzeText(Bitmap bitmap, PageSegMode pageMode = PageSegMode.SingleLine, bool numbersOnly = false, int engineAcquireTimeoutMs = 5000, int processTimeoutMs = 0)
+		{
+			TesseractEngine e;
+			var waitStart = Stopwatch.StartNew();
+			while (!engines.TryTake(out e))
+			{
+				int remainingWait = engineAcquireTimeoutMs - (int)waitStart.ElapsedMilliseconds;
+				if (remainingWait <= 0)
+				{
+					Logger.Warn("OCR engine acquisition timed out after {timeout}ms (mode={mode})", engineAcquireTimeoutMs, pageMode);
+					return string.Empty;
+				}
+
+				engineAvailable.WaitOne(Math.Min(25, remainingWait));
+			}
+
+			e.SetVariable("tessedit_char_whitelist", numbersOnly ? "0123456789" : string.Empty);
+
+			if (processTimeoutMs <= 0)
+			{
+				try
+				{
+					return ExtractText(e, bitmap, pageMode);
+				}
+				finally
+				{
+					engines.Add(e);
+					engineAvailable.Set();
+				}
+			}
+
+			var ocrTask = Task.Run(() =>
+			{
+				try
+				{
+					return ExtractText(e, bitmap, pageMode);
+				}
+				finally
+				{
+					engines.Add(e);
+					engineAvailable.Set();
+				}
+			});
+
+			if (!ocrTask.Wait(processTimeoutMs))
+			{
+				_ = ocrTask.ContinueWith(t =>
+				{
+					if (t.IsFaulted && t.Exception != null)
+					{
+						Logger.Debug(t.Exception, "Late OCR task completed with error after timeout");
+					}
+				}, TaskContinuationOptions.OnlyOnFaulted);
+
+				Logger.Warn("OCR processing timed out after {timeout}ms (mode={mode})", processTimeoutMs, pageMode);
+				return string.Empty;
+			}
+
+			if (ocrTask.IsFaulted)
+			{
+				Logger.Warn(ocrTask.Exception, "OCR processing failed");
+				return string.Empty;
+			}
+
+			return ocrTask.Result;
 		}
 
 		#endregion OCR

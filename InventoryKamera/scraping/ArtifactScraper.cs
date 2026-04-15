@@ -14,6 +14,7 @@ namespace InventoryKamera
     internal class ArtifactScraper : InventoryScraper
 	{
 		private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+		private const int HeavyOcrTimeoutMs = 4000;
 
 		public ArtifactScraper() 
 		{
@@ -505,7 +506,7 @@ namespace InventoryKamera
 			bool hasUnactivated = false;
 			using (var n = GenshinProcesor.ConvertToGrayscale(bm))
 			{
-				text = GenshinProcesor.AnalyzeText(n, Tesseract.PageSegMode.Auto).ToLower();
+				text = GenshinProcesor.AnalyzeText(n, Tesseract.PageSegMode.Auto, processTimeoutMs: HeavyOcrTimeoutMs).ToLower();
 			}
 
 			if(text.Contains("(unactivated)"))
@@ -620,7 +621,7 @@ namespace InventoryKamera
                     g.Clear(Color.White);
                     g.DrawImage(grayscale, (padded.Width - grayscale.Width) / 2, (padded.Height - grayscale.Height) / 2);
 
-                    var scannedText = GenshinProcesor.AnalyzeText(grayscale, Tesseract.PageSegMode.Auto).ToLower().Replace("\n", " ");
+					var scannedText = GenshinProcesor.AnalyzeText(grayscale, Tesseract.PageSegMode.Auto, processTimeoutMs: HeavyOcrTimeoutMs).ToLower().Replace("\n", " ");
                     string text = Regex.Replace(scannedText, @"[\W]", string.Empty);
                     text = GenshinProcesor.FindClosestArtifactSetFromArtifactName(text);
 
