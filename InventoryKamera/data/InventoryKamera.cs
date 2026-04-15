@@ -91,8 +91,22 @@ namespace InventoryKamera
 		public void StopImageProcessorWorkers()
 		{
 			b_threadCancel = true;
+			weaponScraper.StopScanning = true;
+			artifactScraper.StopScanning = true;
 			AwaitProcessors();
 			workerQueue = new Queue<OCRImageCollection>();
+		}
+
+		public void RequestStop()
+		{
+			b_threadCancel = true;
+			weaponScraper.StopScanning = true;
+			artifactScraper.StopScanning = true;
+		}
+
+		private bool ShouldStop()
+		{
+			return b_threadCancel;
 		}
 
 		public void GatherData()
@@ -120,6 +134,7 @@ namespace InventoryKamera
             // Assign Wanderer's custom name
             GenshinProcesor.UpdateCharacterName("wanderer", Properties.Settings.Default.WandererName);
 
+			bool patchedManequins = false;
 			try
 			{
                 GenshinProcesor.UpdateCharacterName("manequin1", Properties.Settings.Default.Manequin1Name);
@@ -224,9 +239,17 @@ namespace InventoryKamera
 				jsonToOutput += manequinData;
                 //save to file here
                 File.WriteAllText(path, jsonToOutput);
-
-                GatherData();
+				patchedManequins = true;
 			}
+
+			if (patchedManequins)
+			{
+				GenshinProcesor.ReloadData();
+				GenshinProcesor.UpdateCharacterName("manequin1", Properties.Settings.Default.Manequin1Name);
+				GenshinProcesor.UpdateCharacterName("manequin2", Properties.Settings.Default.Manequin2Name);
+			}
+
+			if (ShouldStop()) return;
 
             if (Properties.Settings.Default.ScanWeapons)
 			{
@@ -269,6 +292,8 @@ namespace InventoryKamera
 				Logger.Info("Done scanning artifacts");
 			}
 
+			if (ShouldStop()) return;
+
 			workerQueue.Enqueue(new OCRImageCollection(null, "END", 0));
 
 			if (Properties.Settings.Default.ScanCharacters)
@@ -291,6 +316,8 @@ namespace InventoryKamera
 
 			// Wait for Image Processors to finish
 			AwaitProcessors();
+
+			if (ShouldStop()) return;
 
 			if (Properties.Settings.Default.ScanCharacters)
 			{
@@ -353,6 +380,10 @@ namespace InventoryKamera
 			while (ImageProcessors.Count > 0)
 			{
 				ImageProcessors.RemoveAll(process => !process.IsAlive);
+				if (ImageProcessors.Count > 0)
+				{
+					Thread.Sleep(25);
+				}
 			}
 			b_threadCancel = false;
 		}

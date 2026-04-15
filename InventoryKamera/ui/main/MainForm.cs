@@ -86,10 +86,11 @@ namespace InventoryKamera
             Logger.Info("Hotkey pressed");
             e.Handled = true;
             // Check if scanner is running
-            if (scannerThread.IsAlive)
+            if (scannerThread?.IsAlive == true)
             {
-                // Stop navigating weapons/artifacts
-                scannerThread.Abort();
+                // Request graceful stop to avoid aborting worker/thread state mid-operation.
+                data?.RequestStop();
+                data?.StopImageProcessorWorkers();
 
                 UserInterface.SetProgramStatus("Scan Stopped");
 
@@ -113,7 +114,7 @@ namespace InventoryKamera
 
         public static void UnexpectedError(string error)
         {
-            if (scannerThread.IsAlive)
+            if (scannerThread?.IsAlive == true)
             {
                 UserInterface.AddError(error);
             }
@@ -277,6 +278,7 @@ namespace InventoryKamera
 
                 scannerThread = new Thread(() =>
                 {
+                    GOOD exportedData = null;
                     try
                     {
                         // Get Screen Location and Size
@@ -315,7 +317,7 @@ namespace InventoryKamera
                         Logger.Info("Exported data");
 
                         UserInterface.SetProgramStatus("Finished");
-                        OpenOptimizerDialog(good);
+                        exportedData = good;
                     }
                     catch (ThreadAbortException)
                     {
@@ -343,6 +345,12 @@ namespace InventoryKamera
                         {
                             ManualExportButton.Enabled = data.HasData;
                         });
+
+                        if (exportedData != null)
+                        {
+                            BeginInvoke((MethodInvoker)delegate { OpenOptimizerDialog(exportedData); });
+                        }
+
                         MainForm_Activate();
                     }
                 })
