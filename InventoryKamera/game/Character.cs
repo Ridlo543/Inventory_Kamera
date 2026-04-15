@@ -9,7 +9,6 @@ namespace InventoryKamera
     {
         private string _nameKey;
         private string _element;
-        private WeaponType _weaponType;
 
         [JsonProperty("key")]
         public string NameGOOD

@@ -308,6 +308,7 @@ namespace InventoryKamera
 
                         if (data.StopRequested)
                         {
+                            Logger.Info("Scan stopped by user request");
                             UserInterface.SetProgramStatus("Scan stopped");
                             return;
                         }
@@ -329,11 +330,19 @@ namespace InventoryKamera
                     }
                     catch (Exception ex)
                     {
-                        // Workers can get stuck if the thread is aborted or an exception is raised
-                        data?.StopImageProcessorWorkers();
-                        while (ex.InnerException != null) ex = ex.InnerException;
-                        UserInterface.AddError(ex.ToString());
-                        UserInterface.SetProgramStatus("Scan aborted", ok: false);
+                        if (data?.StopRequested == true)
+                        {
+                            Logger.Info("Scan stopped during processing");
+                            UserInterface.SetProgramStatus("Scan stopped");
+                        }
+                        else
+                        {
+                            // Workers can get stuck if an exception is raised
+                            data?.StopImageProcessorWorkers();
+                            while (ex.InnerException != null) ex = ex.InnerException;
+                            UserInterface.AddError(ex.ToString());
+                            UserInterface.SetProgramStatus("Scan aborted", ok: false);
+                        }
                     }
                     finally
                     {
