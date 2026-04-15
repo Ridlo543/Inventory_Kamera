@@ -19,6 +19,8 @@ namespace InventoryKamera
 		private static RECT WindowSize;
 		private static RECT WindowPosition;
 		private static Size AspectRatio;
+		public static readonly Size Aspect16By9 = new Size(16, 9);
+		public static readonly Size Aspect16By10 = new Size(8, 5);
 		public static bool IsNormal { get; private set; }
 
         private static double delay = 1;
@@ -285,9 +287,23 @@ namespace InventoryKamera
 			int y = WindowSize.Height/GCD(WindowSize.Width, WindowSize.Height);
 			var size = new Size(x, y);
 			
-			IsNormal = size == new Size(16, 9);
+			IsNormal = size == Aspect16By9;
 
 			return size;
+		}
+
+		public static bool IsSupportedAspectRatio()
+		{
+			var size = GetAspectRatio();
+			return size == Aspect16By9 || size == Aspect16By10;
+		}
+
+		public static double GetReferenceHeight()
+		{
+			var size = GetAspectRatio();
+			if (size == Aspect16By9) return 720.0;
+			if (size == Aspect16By10) return 800.0;
+			throw new NotImplementedException($"Unsupported aspect ratio: {size.Width}:{size.Height}");
 		}
 
 		private static int GCD(int a, int b)
@@ -527,6 +543,66 @@ namespace InventoryKamera
 		public static void Wait(int ms = 1000)
 		{
 			Thread.Sleep(ms);
+		}
+
+		public static void WaitForScrollSettle(int stableSamples = 2, int sampleDelayMs = 60, int maxWaitMs = 700)
+		{
+			if (stableSamples < 1) stableSamples = 1;
+			if (sampleDelayMs < 10) sampleDelayMs = 10;
+			if (maxWaitMs < sampleDelayMs) maxWaitMs = sampleDelayMs;
+
+			long elapsed = 0;
+			int consecutiveStable = 0;
+			long? previousHash = null;
+
+			while (elapsed <= maxWaitMs)
+			{
+				long hash = CaptureWindowHash();
+				if (previousHash.HasValue && previousHash.Value == hash)
+				{
+					consecutiveStable++;
+					if (consecutiveStable >= stableSamples)
+					{
+						return;
+					}
+				}
+				else
+				{
+					consecutiveStable = 0;
+					previousHash = hash;
+				}
+
+				Wait(sampleDelayMs);
+				elapsed += sampleDelayMs;
+			}
+
+			long CaptureWindowHash()
+			{
+				using (var snapshot = CaptureWindow())
+				{
+					// Sample in a coarse grid to cheaply detect frame-level movement.
+					int xStart = (int)(snapshot.Width * 0.08);
+					int xEnd = (int)(snapshot.Width * 0.66);
+					int yStart = (int)(snapshot.Height * 0.10);
+					int yEnd = (int)(snapshot.Height * 0.88);
+					int xStep = Math.Max(6, snapshot.Width / 60);
+					int yStep = Math.Max(6, snapshot.Height / 36);
+					long hash = 17;
+
+					for (int y = yStart; y < yEnd; y += yStep)
+					{
+						for (int x = xStart; x < xEnd; x += xStep)
+						{
+							Color p = snapshot.GetPixel(x, y);
+							hash = (hash * 31) + p.R;
+							hash = (hash * 31) + p.G;
+							hash = (hash * 31) + p.B;
+						}
+					}
+
+					return hash;
+				}
+			}
 		}
 
 		public static void SetDelay(double _delay)

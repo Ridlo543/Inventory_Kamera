@@ -3,6 +3,7 @@ using Accord.Imaging.Filters;
 using NLog;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -227,17 +228,12 @@ namespace InventoryKamera
         {
             // Size of an item card is the same in 16:10 and 16:9. Also accounts for character icon and resolution size.
             double base_aspect_width = 1280.0;
-            double base_aspect_height = 720.0;
+            double base_aspect_height = Navigation.GetReferenceHeight();
             var icon = new Rectangle(
                 x: 0,
                 y: 0,
                 width: (int)(screenshot.Width * 0.0651),
                 height: (int)(screenshot.Height * (Navigation.IsNormal ? 0.1417: 0.1289)));
-
-            if (Navigation.GetAspectRatio() == new Size(8, 5))
-            {
-                base_aspect_height = 800.0;
-            }
 
             // Filter for relative size of items in inventory, give or take a few pixels
             int iconMinHeight = icon.Height - ((int)(icon.Height * 0.15));
@@ -346,7 +342,41 @@ namespace InventoryKamera
                 colCoords.Sort();
                 rowCoords.Sort();
 
-                colCoords.RemoveAll(col => col > screenshot.Width * 0.68);
+                // Keep only inventory-grid columns (exclude right details panel).
+                double maxGridX = screenshot.Width * 0.695;
+                colCoords.RemoveAll(col => col > maxGridX);
+
+                if (inventoryPage == InventoryPage.Artifacts)
+                {
+                    int expectedCols = 8;
+                    int expectedRows = Navigation.IsNormal ? 4 : 5;
+
+                    // If one column is missed, infer the right-most column from observed spacing.
+                    if (colCoords.Count == expectedCols - 1)
+                    {
+                        var gaps = colCoords.Zip(colCoords.Skip(1), (a, b) => b - a).Where(g => g > 0).ToList();
+                        if (gaps.Count > 0)
+                        {
+                            int inferredGap = (int)Math.Round(gaps.Average());
+                            int inferredRight = colCoords[colCoords.Count - 1] + inferredGap;
+                            if (inferredRight <= screenshot.Width * 0.705)
+                            {
+                                colCoords.Add(inferredRight);
+                            }
+                        }
+                    }
+
+                    if (colCoords.Count > expectedCols)
+                    {
+                        colCoords = colCoords.Take(expectedCols).ToList();
+                    }
+
+                    // Drop partial bottom rows that can appear during mid-scroll alignment.
+                    if (rowCoords.Count > expectedRows)
+                    {
+                        rowCoords = rowCoords.Take(expectedRows).ToList();
+                    }
+                }
 
                 foreach (var row in rowCoords)
                 {
@@ -424,15 +454,40 @@ namespace InventoryKamera
                     int rows = 0;
                     int itemCount = 0;
                     int attempts = 0;
+                    int minDetectedCount = int.MaxValue;
+                    int maxDetectedCount = int.MinValue;
+                    var mismatchCounts = new Dictionary<int, int>();
                     double weight = 0;
                     const int maxAttempts = 50;
                     const double minWeight = -0.50;
                     const double maxWeight = 1.00;
                     int itemPerPage = (inventoryPage != InventoryPage.Artifacts || !Navigation.IsNormal) ? 40 : 32;
+                    var detectionTimer = Stopwatch.StartNew();
                     do
                     {
+                        if (InventoryKamera.IsStopRequested)
+                        {
+                            Logger.Info("Stop requested while locating {0} page {1}; aborting layout retries.", inventoryPage, pageNum);
+                            break;
+                        }
+
                         (rectangles, cols, rows) = ProcessScreenshot(processedScreenshot, weight);
                         itemCount = rows * cols;
+                        minDetectedCount = Math.Min(minDetectedCount, itemCount);
+                        maxDetectedCount = Math.Max(maxDetectedCount, itemCount);
+
+                        if (itemCount != itemPerPage)
+                        {
+                            if (mismatchCounts.TryGetValue(itemCount, out int count))
+                            {
+                                mismatchCounts[itemCount] = count + 1;
+                            }
+                            else
+                            {
+                                mismatchCounts[itemCount] = 1;
+                            }
+                        }
+
                         if (itemCount != itemPerPage && !acceptLess)
                         {
                             int attemptNumber = attempts + 1;
@@ -469,6 +524,33 @@ namespace InventoryKamera
                     }
                     while (itemCount != itemPerPage && !acceptLess && attempts < maxAttempts);
 
+                    if (attempts > 0)
+                    {
+                        var mismatchProfile = mismatchCounts.Count == 0
+                            ? "none"
+                            : string.Join(",",
+                                mismatchCounts
+                                    .OrderByDescending(kv => kv.Value)
+                                    .ThenBy(kv => Math.Abs(kv.Key - itemPerPage))
+                                    .Take(3)
+                                    .Select(kv => $"{kv.Key}x{kv.Value}"));
+
+                        Logger.Info(
+                            "PageDetectDiagnostics|Page={0}|Inventory={1}|AcceptLess={2}|Attempts={3}|FinalRows={4}|FinalCols={5}|FinalCount={6}|FinalWeight={7:0.00}|DurationMs={8}|MinCount={9}|MaxCount={10}|MismatchProfile={11}",
+                            pageNum,
+                            inventoryPage,
+                            acceptLess,
+                            attempts,
+                            rows,
+                            cols,
+                            itemCount,
+                            weight,
+                            detectionTimer.ElapsedMilliseconds,
+                            minDetectedCount == int.MaxValue ? 0 : minDetectedCount,
+                            maxDetectedCount == int.MinValue ? 0 : maxDetectedCount,
+                            mismatchProfile);
+                    }
+
                     if (Properties.Settings.Default.LogScreenshots)
                     {
                         SaveInventoryBitmap(screenshot, $"{inventoryPage}Inventory.png");
@@ -484,6 +566,12 @@ namespace InventoryKamera
 
                     if (rectangles == null || rectangles.Count == 0 || cols <= 0 || rows <= 0)
                     {
+                        if (InventoryKamera.IsStopRequested)
+                        {
+                            Logger.Info("Stop requested while finding page layout for {0} page {1}.", inventoryPage, pageNum);
+                            return (rectangles ?? new List<Rectangle>(), cols, rows);
+                        }
+
                         Logger.Warn("Could not find a valid page for {0}. Re-using previous item page. Last attempt: {1} rows x {2} cols on page {3}.", inventoryPage, rows, cols, pageNum);
 
                         return prevRect == null ?

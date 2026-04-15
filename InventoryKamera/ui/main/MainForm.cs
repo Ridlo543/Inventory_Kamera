@@ -279,13 +279,7 @@ namespace InventoryKamera
                         // Get Screen Location and Size
                         Navigation.Initialize();
 
-                        List<Size> sizes = new List<Size>
-                        {
-                            new Size(16,9),
-                            new Size(8,5),
-                        };
-
-                        if (!sizes.Contains(Navigation.GetAspectRatio()))
+                        if (!Navigation.IsSupportedAspectRatio())
                         {
                             throw new NotImplementedException($"{Navigation.GetSize().Width}x{Navigation.GetSize().Height} is an unsupported resolution.");
                         }

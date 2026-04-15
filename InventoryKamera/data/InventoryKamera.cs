@@ -36,9 +36,11 @@ namespace InventoryKamera
 
 		private volatile bool b_threadCancel;
 		private volatile bool b_stopRequested;
+		private static volatile bool g_stopRequested;
 		private readonly int NumWorkers;
 
 		public bool StopRequested => b_stopRequested;
+		public static bool IsStopRequested => g_stopRequested;
 
 		public bool HasData
         {
@@ -61,6 +63,7 @@ namespace InventoryKamera
 
 			b_threadCancel = false;
 			b_stopRequested = false;
+			g_stopRequested = false;
 
             switch (Properties.Settings.Default.ScannerDelay)
             {
@@ -97,6 +100,7 @@ namespace InventoryKamera
 		{
 			b_threadCancel = true;
 			b_stopRequested = true;
+			g_stopRequested = true;
 			weaponScraper.StopScanning = true;
 			artifactScraper.StopScanning = true;
 			workerQueue.Signal();
@@ -108,6 +112,7 @@ namespace InventoryKamera
 		{
 			b_threadCancel = true;
 			b_stopRequested = true;
+			g_stopRequested = true;
 			weaponScraper.StopScanning = true;
 			artifactScraper.StopScanning = true;
 			workerQueue.Signal();
@@ -129,6 +134,7 @@ namespace InventoryKamera
 			try
 			{
 			b_stopRequested = false;
+			g_stopRequested = false;
 
 			var setupTimer = Stopwatch.StartNew();
 			ResetLogging();

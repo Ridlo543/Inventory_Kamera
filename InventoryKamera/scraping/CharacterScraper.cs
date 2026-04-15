@@ -31,6 +31,12 @@ namespace InventoryKamera
 
 			while (true)
 			{
+				if (InventoryKamera.IsStopRequested)
+				{
+					Logger.Info("Character scan stopped by user request");
+					break;
+				}
+
 				var character = ScanCharacter(first);
 				if(character.NameGOOD != "manequin")
 				{

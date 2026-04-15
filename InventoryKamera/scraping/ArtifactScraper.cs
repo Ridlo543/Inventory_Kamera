@@ -98,6 +98,12 @@ namespace InventoryKamera
 			// Go through artifact list
 			while (cardsQueued < artifactCount)
 			{
+				if (InventoryKamera.IsStopRequested)
+				{
+					Logger.Info("Stop requested while scanning artifacts; exiting.");
+					return;
+				}
+
 				if (rectangles == null || rectangles.Count == 0 || cols <= 0 || rows <= 0)
 				{
 					Logger.Warn("Invalid page detection while scanning artifacts (page {0}). rows={1}, cols={2}, rectangles={3}", page, rows, cols, rectangles == null ? -1 : rectangles.Count);
@@ -119,6 +125,12 @@ namespace InventoryKamera
 				// items are scrolled to, offset the index of rectangle to start clicking from
 				for (int i = startIndex; i < rectangles.Count; i++)
 				{
+					if (InventoryKamera.IsStopRequested)
+					{
+						Logger.Info("Stop requested while queuing artifacts on page {0}; exiting.", page);
+						return;
+					}
+
 					Rectangle item = rectangles[i];
 					Navigation.SetCursor(item.Center().X, item.Center().Y);
 					Navigation.Click();

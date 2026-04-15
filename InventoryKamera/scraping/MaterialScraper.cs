@@ -72,6 +72,12 @@ namespace InventoryKamera
 			// Keep scanning while not repeating any items names
 			while (true)
 			{
+				if (InventoryKamera.IsStopRequested)
+				{
+					Logger.Info("Material scan stopped by user request");
+					return;
+				}
+
 				int rows, cols;
 				// Find all items on the screen
 				(rectangles, cols, rows) = GetPageOfItems(page, acceptLess: true);
@@ -86,6 +92,12 @@ namespace InventoryKamera
 
 				foreach (var rectangle in r)
 				{
+					if (InventoryKamera.IsStopRequested)
+					{
+						Logger.Info("Material scan stopped while processing page {0}", page);
+						return;
+					}
+
 					// Select Material
 					Navigation.SetCursor(rectangle.Center().X, rectangle.Center().Y);
 					Navigation.Click();
@@ -135,6 +147,12 @@ namespace InventoryKamera
 				// Scroll to next page
 				for (int i = 0; i < rows - 1; i++)
 				{
+					if (InventoryKamera.IsStopRequested)
+					{
+						Logger.Info("Material scan stopped during scrolling phase");
+						return;
+					}
+
 					scrollCount++;
 
 					// scroll down
@@ -165,9 +183,21 @@ namespace InventoryKamera
 			}
 
 		LastPage:
+			if (InventoryKamera.IsStopRequested)
+			{
+				Logger.Info("Material scan stopped before last page processing");
+				return;
+			}
+
 			// scroll down as much as possible
 			for (int i = 0; i < 20; i++)
 			{
+				if (InventoryKamera.IsStopRequested)
+				{
+					Logger.Info("Material scan stopped during last page scroll");
+					return;
+				}
+
 				Navigation.sim.Mouse.VerticalScroll(-1);
 				Navigation.SystemWait(Navigation.Speed.InventoryScroll);
 			}
@@ -178,6 +208,12 @@ namespace InventoryKamera
 			bool passby = true;
 			for (int i = rectangles.Count - 1; i >= 0; i--) // Click through but backwards to short-circuit after new materials
 			{
+				if (InventoryKamera.IsStopRequested)
+				{
+					Logger.Info("Material scan stopped during final page processing");
+					return;
+				}
+
 				// Select Material
 				Rectangle rectangle = rectangles[i];
 				Navigation.SetCursor(rectangle.Center().X, rectangle.Center().Y);
@@ -274,7 +310,7 @@ namespace InventoryKamera
 		{
 			// Grab item name on right
 			var refWidth = 1280.0;
-			var refHeight = Navigation.GetAspectRatio() == new Size(16,9) ? 720.0 : 800.0;
+			var refHeight = Navigation.GetReferenceHeight();
 
 			var width = Navigation.GetWidth();
 			var height = Navigation.GetHeight();
