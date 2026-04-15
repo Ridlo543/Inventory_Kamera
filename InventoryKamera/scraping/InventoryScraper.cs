@@ -246,17 +246,17 @@ namespace InventoryKamera
             int iconMaxWidth = icon.Width + ((int)(icon.Width * 0.15));
 
             // Keep blob filter bounds valid while weight is tuned dynamically.
-            int minHeight = Math.Max(1, (int)(iconMinHeight * (1 - weight)));
-            int maxHeight = Math.Max(minHeight, (int)(iconMaxHeight * (1 + weight)));
-            int minWidth = Math.Max(1, (int)(iconMinWidth * (1 - weight)));
-            int maxWidth = Math.Max(minWidth, (int)(iconMaxWidth * (1 + weight)));
+            int blobMinHeight = Math.Max(1, (int)(iconMinHeight * (1 - weight)));
+            int blobMaxHeight = Math.Max(blobMinHeight, (int)(iconMaxHeight * (1 + weight)));
+            int blobMinWidth = Math.Max(1, (int)(iconMinWidth * (1 - weight)));
+            int blobMaxWidth = Math.Max(blobMinWidth, (int)(iconMaxWidth * (1 + weight)));
             using (BlobCounter blobCounter = new BlobCounter
             {
                 FilterBlobs = true,
-                MinHeight = minHeight,
-                MaxHeight = maxHeight,
-                MinWidth = minWidth,
-                MaxWidth = maxWidth,
+                MinHeight = blobMinHeight,
+                MaxHeight = blobMaxHeight,
+                MinWidth = blobMinWidth,
+                MaxWidth = blobMaxWidth,
             })
             {
                 // Image pre-processing

@@ -140,7 +140,7 @@ namespace InventoryKamera
                 GenshinProcesor.UpdateCharacterName("manequin1", Properties.Settings.Default.Manequin1Name);
                 GenshinProcesor.UpdateCharacterName("manequin2", Properties.Settings.Default.Manequin2Name);
             }
-			catch(Exception e)
+			catch(Exception)
 			{
 				// Source - https://stackoverflow.com/questions/33081102/how-to-add-a-new-object-to-an-existing-json-file
 				// Posted by Alex, modified by community. See post 'Timeline' for change history
